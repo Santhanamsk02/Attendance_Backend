@@ -118,7 +118,11 @@ def create_batch(department_id: str, batch_in: BatchCreate, db: Session = Depend
     )
     db.add(db_batch)
 
-    from ..models.reference import Section
+    from ..models.reference import Section, Semester
+    for i in range(1, 11):
+        if not db.query(Semester).filter(Semester.id == i).first():
+            db.add(Semester(id=i, name=f"Semester {i}"))
+            
     for i in range(batch_in.sections_count):
         sec_char = chr(65 + i)
         if not db.query(Section).filter(Section.id == sec_char).first():
@@ -186,7 +190,11 @@ def update_batch(department_id: str, batch_id: str, batch_in: BatchCreate, db: S
     batch.current_semester = batch_in.current_semester
     batch.sections_count = batch_in.sections_count
     
-    from ..models.reference import Section
+    from ..models.reference import Section, Semester
+    for i in range(1, 11):
+        if not db.query(Semester).filter(Semester.id == i).first():
+            db.add(Semester(id=i, name=f"Semester {i}"))
+            
     for i in range(batch_in.sections_count):
         sec_char = chr(65 + i)
         if not db.query(Section).filter(Section.id == sec_char).first():

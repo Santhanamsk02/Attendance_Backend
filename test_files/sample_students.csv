@@ -1,0 +1,8 @@
+roll_no,name,email,phone,department,semester,section,academic_year,status
+23IT201,Kavitha Ramasamy,kavitha.r@example.com,9876543230,Information Technology,3,A,2026-2027,active
+23IT202,Manoj Kumar,manoj.k@example.com,9876543231,Information Technology,3,A,2026-2027,active
+23CS201,Pooja Hegde,pooja.h@example.com,9876543232,Computer Science,3,B,2026-2027,active
+23EC201,Naveen Raj,naveen.r@example.com,9876543233,Electronics & Communication,3,A,2026-2027,active
+,Invalid Student No Roll,no.roll@example.com,9876543234,Information Technology,3,A,2026-2027,active
+23IT203,Bad Semester Student,bad.sem@example.com,9876543235,Information Technology,12,A,2026-2027,active
+23IT201,Duplicate In File,dup@example.com,9876543236,Information Technology,3,A,2026-2027,active

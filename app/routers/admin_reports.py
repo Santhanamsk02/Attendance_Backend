@@ -123,12 +123,21 @@ def get_daily_register(
     # Who was present on this date?
     present_ids: set = set()
     if all_ids:
-        marks = db.query(DayWiseAttendance.student_id).filter(
+        marks_daywise = db.query(DayWiseAttendance.student_id).filter(
             DayWiseAttendance.date == att_date,
             DayWiseAttendance.student_id.in_(all_ids),
             DayWiseAttendance.status == "PRESENT"
         ).all()
-        present_ids = {m.student_id for m in marks}
+        
+        marks_session = db.query(AttendanceMark.student_id).join(
+            AttendanceSession, AttendanceMark.session_id == AttendanceSession.id
+        ).filter(
+            AttendanceSession.date == att_date,
+            AttendanceMark.student_id.in_(all_ids),
+            AttendanceMark.status == "PRESENT"
+        ).all()
+        
+        present_ids = {m.student_id for m in marks_daywise} | {m.student_id for m in marks_session}
 
     absent_ids = set(all_ids) - present_ids
 
@@ -168,7 +177,6 @@ def get_daily_register(
 
     if student_ids:
         from sqlalchemy import func, case
-        from app.models.attendance import AttendanceMark, AttendanceSession
 
         # Fetch morning entry status
         morning_marks = (
@@ -372,32 +380,45 @@ def get_student_report(
         raise HTTPException(status_code=404, detail="Student not found")
 
     if not from_date:
-        from_date = date.today() - timedelta(days=89)
+        # Find the earliest date for the student's batch
+        earliest_session = db.query(AttendanceSession.date).filter(
+            AttendanceSession.batch_id == student.batch_id,
+            AttendanceSession.status == "COMPLETED"
+        ).order_by(AttendanceSession.date.asc()).first()
+        if earliest_session:
+            from_date = earliest_session.date
+        else:
+            from_date = date.today() - timedelta(days=89)
     if not to_date:
         to_date = date.today()
 
     # All day-wise marks in range
-    marks = db.query(DayWiseAttendance).filter(
+    marks_daywise = db.query(DayWiseAttendance).filter(
         DayWiseAttendance.student_id == student_id,
         DayWiseAttendance.date >= from_date,
         DayWiseAttendance.date <= to_date,
     ).all()
-    present_dates = {m.date.isoformat() for m in marks if m.status == "PRESENT"}
+    present_dates = {m.date.isoformat() for m in marks_daywise if m.status == "PRESENT"}
 
-    # Get working dates for the section
-    working_dates_query = db.execute(text("""
-        SELECT DISTINCT date 
-        FROM day_wise_attendance
-        WHERE date BETWEEN :f AND :t
-          AND student_id IN (
-              SELECT id FROM students WHERE section = :sec
-          )
-    """), {
-        "f": from_date.isoformat(),
-        "t": to_date.isoformat(),
-        "sec": student.section
-    }).fetchall()
-    working_dates = {str(r.date) for r in working_dates_query}
+    # Also check period-wise marks (AttendanceMark) in the same range
+    marks_session = db.query(AttendanceSession.date).join(
+        AttendanceMark, AttendanceMark.session_id == AttendanceSession.id
+    ).filter(
+        AttendanceMark.student_id == student_id,
+        AttendanceMark.status == "PRESENT",
+        AttendanceSession.date >= from_date,
+        AttendanceSession.date <= to_date
+    ).all()
+    present_dates.update(m.date.isoformat() for m in marks_session)
+
+    # Get working dates for the batch
+    working_dates_query = db.query(AttendanceSession.date).filter(
+        AttendanceSession.batch_id == student.batch_id,
+        AttendanceSession.status == "COMPLETED",
+        AttendanceSession.date >= from_date,
+        AttendanceSession.date <= to_date
+    ).distinct().all()
+    working_dates = {m.date.isoformat() for m in working_dates_query}
 
     # Build heatmap: for each date in range
     heatmap = []
@@ -593,6 +614,8 @@ def get_defaulters(
     threshold: float = Query(75.0),
     department_id: Optional[str] = None,
     section: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    query: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
     db: Session = Depends(get_db),
@@ -612,13 +635,16 @@ def get_defaulters(
         WHERE s.status = 'active'
           AND (:dept IS NULL OR s.department_id = :dept)
           AND (:sec IS NULL OR s.section = :sec)
+          AND (:batch IS NULL OR s.batch_id = :batch)
+          AND (:query IS NULL OR (s.name ILIKE :query_like OR s.roll_no ILIKE :query_like))
         GROUP BY s.id
         HAVING total_working_days > 0
            AND ROUND(CAST(present_days AS FLOAT) / total_working_days * 100, 2) < :threshold
         ORDER BY ROUND(CAST(present_days AS FLOAT) / total_working_days * 100, 2)
     """)
     results = db.execute(base_sql, {
-        "dept": department_id, "sec": section, "threshold": threshold
+        "dept": department_id, "sec": section, "threshold": threshold,
+        "batch": batch_id, "query": query, "query_like": f"%{query}%" if query else None
     }).fetchall()
 
     total = len(results)
@@ -666,10 +692,23 @@ def export_defaulters(
     threshold: float = Query(75.0),
     department_id: Optional[str] = None,
     section: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    query: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    data = get_defaulters(threshold=threshold, department_id=department_id,
-                          section=section, page=1, page_size=10000, db=db)
+    import csv
+    import io
+
+    data = get_defaulters(
+        threshold=threshold,
+        department_id=department_id,
+        section=section,
+        batch_id=batch_id,
+        query=query,
+        page=1,
+        page_size=100000,
+        db=db
+    )
     output = io.StringIO()
     fields = ["roll_no", "name", "section", "semester", "email", "phone",
               "present_days", "total_working_days", "attendance_pct", "days_needed"]

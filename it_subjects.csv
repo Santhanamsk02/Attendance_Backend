@@ -1,0 +1,11 @@
+subject_code,subject_name,subject_title,department,academic_year,semester,subject_type,credits,description,status
+23IT1701,CBD,Cloud Computing and Big Data Analytics,IT,2023-2027,7,theory,3,Cloud computing and big data analytics,active
+23CS1701,CCS,Cryptography and Cyber Security,IT,2023-2027,7,theory,3,Cryptography and cyber security concepts,active
+23MG1701,POM,Principles of Management,IT,2023-2027,7,theory,3,Principles and practices of management,active
+23IT1905,DEV,DevOps,IT,2023-2027,7,theory,3,"DevOps principles, practices and tools",active
+23IT1904,UI/UX,UI and UX Design,IT,2023-2027,7,theory,3,User interface and user experience design,active
+23ME1944,SCM,Supply Chain Management,IT,2023-2027,7,theory,3,Supply chain management concepts and practices,active
+23CS1711,CCS LAB,Cryptography and Cyber Security Laboratory,IT,2023-2027,7,practical,2,Practical laboratory for cryptography and cyber security,active
+23IT1711,CBD LAB,Cloud Computing and Big Data Analytics Laboratory,IT,2023-2027,7,practical,2,Practical laboratory for cloud computing and big data analytics,active
+23CS1905,SPC,Security and Privacy In Cloud,IT,2023-2027,7,theory,3,,active
+LIB2023,LIB,Library,IT,2023-2027,7,theory,3,,active

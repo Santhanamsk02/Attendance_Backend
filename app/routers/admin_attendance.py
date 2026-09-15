@@ -10,6 +10,7 @@ from app.models.student import Student, StudentEnrollment
 from app.models.subject import Subject
 from app.models.teacher import Teacher
 from app.models.reference import AcademicYear
+from app.models.day_wise_attendance import DayWiseAttendance
 
 router = APIRouter(prefix="/admin/attendance", tags=["Admin Attendance Analytics"])
 
@@ -26,18 +27,18 @@ def search_student_attendance(
     page_size: int = 50,
     db: Session = Depends(get_db)
 ):
-    q = db.query(Student, StudentEnrollment, AcademicYear).join(
+    q = db.query(Student, StudentEnrollment, AcademicYear).outerjoin(
         StudentEnrollment, Student.id == StudentEnrollment.student_id
     ).outerjoin(
         AcademicYear, StudentEnrollment.academic_year_id == AcademicYear.id
     ).filter(Student.status == "active")
     
     if departmentId:
-        q = q.filter(StudentEnrollment.department_id == departmentId)
+        q = q.filter(Student.department_id == departmentId)
     if batchId:
-        q = q.filter(StudentEnrollment.batch_id == batchId)
+        q = q.filter(Student.batch_id == batchId)
     if section:
-        q = q.filter(StudentEnrollment.section_id == section)
+        q = q.filter(Student.section == section)
         
     if query:
         q = q.filter(or_(
@@ -52,22 +53,34 @@ def search_student_attendance(
     
     # Pre-fetch all sessions mapping
     for student, enroll, ac_year in records:
-        # Expected sessions matching enrollment
-        expected_sessions = db.query(AttendanceSession).filter(
+        dept_id = enroll.department_id if enroll else student.department_id
+        batch_id = enroll.batch_id if enroll else student.batch_id
+        
+        # Count unique dates the batch had sessions
+        expected_sessions = db.query(AttendanceSession.date).filter(
             AttendanceSession.status == SessionStatus.COMPLETED,
-            AttendanceSession.department_id == enroll.department_id,
-            AttendanceSession.academic_year_id == enroll.academic_year_id,
-            AttendanceSession.semester == enroll.semester,
-            AttendanceSession.section_id == enroll.section_id
-        ).count()
+            AttendanceSession.department_id == dept_id,
+            AttendanceSession.batch_id == batch_id
+        ).distinct().count()
         
-        present_count = db.query(AttendanceMark).join(AttendanceSession).filter(
+        # Count unique dates the student was present
+        present_dates = set()
+        daywise = db.query(DayWiseAttendance.date).filter(
+            DayWiseAttendance.student_id == student.id,
+            DayWiseAttendance.status == "PRESENT"
+        ).all()
+        present_dates.update(d[0] for d in daywise)
+        
+        sessionwise = db.query(AttendanceSession.date).join(
+            AttendanceMark, AttendanceMark.session_id == AttendanceSession.id
+        ).filter(
             AttendanceMark.student_id == student.id,
-            AttendanceMark.status == "PRESENT",
-            AttendanceSession.academic_year_id == enroll.academic_year_id,
-            AttendanceSession.semester == enroll.semester
-        ).count()
+            AttendanceMark.status == "PRESENT"
+        ).all()
+        present_dates.update(d[0] for d in sessionwise)
         
+        present_count = len(present_dates)
+            
         attendance_percentage = 0
         if expected_sessions > 0:
             attendance_percentage = round((present_count / expected_sessions) * 100, 2)
@@ -76,15 +89,15 @@ def search_student_attendance(
             "id": student.id,
             "roll_no": student.roll_no,
             "name": student.name,
-            "department": enroll.department_id,
+            "department": enroll.department_id if enroll else student.department_id,
             "department_name": student.department_rel.name if student.department_rel else "Unknown",
             "department_code": student.department_rel.code if student.department_rel else "Unknown",
-            "batch": enroll.batch_id,
+            "batch": enroll.batch_id if enroll else student.batch_id,
             "batch_name": student.batch_rel.batch_name if student.batch_rel else "Unknown",
             "current_year": student.batch_rel.current_year if student.batch_rel else None,
-            "semester": enroll.semester,
-            "section": enroll.section_id,
-            "academic_year": ac_year.name if ac_year else str(enroll.academic_year_id),
+            "semester": enroll.semester if enroll else student.semester,
+            "section": enroll.section_id if enroll else student.section,
+            "academic_year": ac_year.name if ac_year else (str(enroll.academic_year_id) if enroll else student.academic_year),
             "expected_sessions": expected_sessions,
             "present_sessions": present_count,
             "attendance_percentage": attendance_percentage
@@ -157,10 +170,10 @@ def get_student_attendance_profile(
             "id": student.id,
             "roll_no": student.roll_no,
             "name": student.name,
-            "department": current_enroll.department_id if current_enroll else None,
-            "batch": current_enroll.batch_id if current_enroll else None,
-            "semester": current_enroll.semester if current_enroll else None,
-            "section": current_enroll.section_id if current_enroll else None,
+            "department": current_enroll.department_id if current_enroll else student.department_id,
+            "batch": current_enroll.batch_id if current_enroll else student.batch_id,
+            "semester": current_enroll.semester if current_enroll else student.semester,
+            "section": current_enroll.section_id if current_enroll else student.section,
             "overall_attendance": overall,
             "expected_classes": expected_classes,
             "present_classes": present_classes,

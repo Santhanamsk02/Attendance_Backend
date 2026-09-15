@@ -10,6 +10,7 @@ from app.models.day_wise_attendance import DayWiseAttendance
 from app.models.timetable import TeacherAssignment
 from app.models.timetable import TimetableStructure
 from app.models.calendar_override import CalendarOverride
+from app.models.section_assignment import SectionSubjectAssignment
 
-__all__ = ["Student", "Teacher", "Department", "Batch", "Semester", "Section", "Subject", "Admin", "AttendanceSession", "AttendanceMark", "TeacherAssignment", "TimetableStructure", "CalendarOverride", "DayWiseAttendance"]
+__all__ = ["Student", "Teacher", "Department", "Batch", "Semester", "Section", "Subject", "Admin", "AttendanceSession", "AttendanceMark", "TeacherAssignment", "TimetableStructure", "CalendarOverride", "DayWiseAttendance", "SectionSubjectAssignment"]
 

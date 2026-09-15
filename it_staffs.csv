@@ -1,0 +1,87 @@
+employee_id,name,email,phone,department,designation,status
+IT202601,Dr. M. Helda Mercy,mhel@pani.in,9142561034,IT,Professor & Head,active
+IT202602,Dr. D. Karunkuzhali,dkar@pani.in,9510532742,IT,Professor,active
+EMP002,Dr. K. Sridharan,ksri@pani.in,9171987427,IT,Professor,active
+IT202604,Dr. B. Buvaneswari,bbuv@pani.in,9650908284,IT,Professor,active
+EMP010,Dr. N. Bala Sundara Ganapathy,nbal@pani.in,9471545457,IT,Professor,active
+EMP020,Dr. B. Karthikeyan,bkar@pani.in,9530879099,IT,Professor,active
+IT202607,Dr. M. Sumithra,msum@pani.in,9161950466,IT,Professor,active
+IT202608,Dr. P.Latha,plat@pani.in,9979697833,IT,Professor,active
+IT202609,Dr.E.Thenmozhi,ethe@pani.in,9805387116,IT,Professor,active
+IT202610,Dr. K. Ramadevi,kram@pani.in,9684313558,IT,Professor,active
+IT202611,Dr. K. Tamilarasi,ktam@pani.in,9846753659,IT,Professor,active
+IT202612,Dr.S.Hemalatha,shem@pani.in,9359825927,IT,Professor,active
+EMP008,Dr. M. Dillibabu,mdil@pani.in,9924156647,IT,Associate Professor,active
+IT202614,Dr. G. Dhanalakshmi,gdha@pani.in,9619010430,IT,Associate Professor,active
+IT202615,Mrs.S.Mary Rexcy Asha,smar@pani.in,9006952580,IT,Associate Professor,active
+IT202616,Mrs. S. Uma,suma@pani.in,9020115330,IT,Associate Professor,active
+IT202617,Dr.K.Muthulakshmi,kmut@pani.in,9626006677,IT,Associate Professor,active
+IT202618,Dr. K. Lalitha,klal@pani.in,9908987108,IT,Associate Professor,active
+IT202619,Mr. S. Gopi,gopi@pani.in,9772840080,IT,Associate Professor,active
+IT202620,Dr.M.Jawahar,mjaw@pani.in,9256993739,IT,Associate Professor,active
+IT202621,Dr.K.Maithili,kmai@pani.in,9071666538,IT,Associate Professor,active
+IT202622,Dr. L. Ramalingam,lram@pani.in,9677963031,IT,Associate Professor,active
+IT202623,Dr. S. Sharanyaa,ssha@pani.in,9769004507,IT,Assistant Professor,active
+IT202625,Mr.V. Kandasamy,vkan@pani.in,9576697126,IT,Assistant Professor,active
+IT202626,Mrs. J. Hemavathy,jhem@pani.in,9237057480,IT,Assistant Professor,active
+IT202627,Mrs. P.Prema,ppre@pani.in,9497243543,IT,Assistant Professor,active
+IT202628,Mrs. S. Prabha,spra@pani.in,9779322138,IT,Assistant Professor,active
+IT202629,Ms. S. Anusherly,sanu@pani.in,9637198930,IT,Assistant Professor,active
+IT202630,Mrs.R.Selvi,rsel@pani.in,9451277632,IT,Assistant Professor,active
+IT202631,Mrs. V. Priyadarsini,vpri@pani.in,9190232878,IT,Assistant Professor,active
+IT202632,Ms. P.Haritha,phar@pani.in,9178345003,IT,Assistant Professor,active
+IT202633,Mrs.A.Rekha,arek@pani.in,9288525435,IT,Assistant Professor,active
+IT202634,Mrs.A.Deepika,adee@pani.in,9696012986,IT,Assistant Professor,active
+IT202635,Mrs. P. Manjuleeswari,pman@pani.in,9399198860,IT,Assistant Professor,active
+IT202636,Mrs.V.Rajeswari,vraj@pani.in,9978526942,IT,Assistant Professor,active
+IT202637,Ms.R.Suseendra,rsus@pani.in,9720457386,IT,Assistant Professor,active
+IT202638,Mr. S.Sasidaran,sasi@pani.in,9666961487,IT,Assistant Professor,active
+IT202639,Ms. S.Smitha Mol,ssmi@pani.in,9225219213,IT,Assistant Professor,active
+IT202640,Mrs. R. Sumathi,rsum@pani.in,9410219667,IT,Assistant Professor,active
+EMP006,Mr.T.Ravi,trav@pani.in,9730613098,IT,Assistant Professor,active
+IT202642,Mrs. C. Rekha,crek@pani.in,9482224461,IT,Assistant Professor,active
+IT202643,Mrs. A. Divya,adiv@pani.in,9179900113,IT,Assistant Professor,active
+IT202644,Ms. R. Jayashree,rjay@pani.in,9834680232,IT,Assistant Professor,active
+IT202645,Mrs. A.P. Shalini,apsh@pani.in,9955652045,IT,Assistant Professor,active
+IT202646,Mrs. Meenakshi Diwakar,meen@pani.in,9873059314,IT,Assistant Professor,active
+IT202647,Mrs.K. Yasodha,kyas@pani.in,9041632991,IT,Assistant Professor,active
+IT202648,Mrs.S. Parameswari,spar@pani.in,9562042697,IT,Assistant Professor,active
+IT202649,Mrs.V.K.Chitra,vkch@pani.in,9167959371,IT,Assistant Professor,active
+IT202650,Mrs.P.Edreena,pedr@pani.in,9551551703,IT,Assistant Professor,active
+IT202651,Ms.S.V. Ruphitha,svru@pani.in,9254274601,IT,Assistant Professor,active
+IT202652,Mrs.L. Sagayadesdemona,lsag@pani.in,9794953511,IT,Assistant Professor,active
+IT202653,Ms.K Haripriya,khar@pani.in,9244358429,IT,Assistant Professor,active
+IT202654,Mrs.H.Aarthi,haar@pani.in,9068060146,IT,Assistant Professor,active
+IT202655,Mrs.A.Sathya,asat@pani.in,9436187330,IT,Assistant Professor,active
+IT202656,Mrs. B. Jerina,bjer@pani.in,9919961471,IT,Assistant Professor,active
+IT202657,Mrs.P. Girija,pgir@pani.in,9877113113,IT,Assistant Professor,active
+IT202658,Mr. G. Aravindan,gara@pani.in,9831733361,IT,Assistant Professor,active
+IT202659,Ms. A. Elis Lisapious,aeli@pani.in,9792995657,IT,Assistant Professor,active
+IT202660,Mr.A.Balaji,abal@pani.in,9928418581,IT,Assistant Professor,active
+IT202661,Mrs.S.Jagadeeswari,sjag@pani.in,9124162194,IT,Assistant Professor,active
+IT202662,Ms.R.Anandhi,rana@pani.in,9266371030,IT,Assistant Professor,active
+IT202663,Ms.T.Preetha,tpre@pani.in,9925103789,IT,Assistant Professor,active
+IT202664,Mrs. K.Vijayalakshmi,kvij@pani.in,9777098634,IT,Assistant Professor,active
+IT202665,Mrs.G.Lalithambal,glal@pani.in,9121384885,IT,Assistant Professor,active
+IT202666,Ms.P.Radha,prad@pani.in,9482225423,IT,Assistant Professor,active
+IT202667,Mrs.S.Kalai Arasi,skal@pani.in,9433777797,IT,Assistant Professor,active
+IT202668,Mrs.S.T.Linsia Raja Winsy,stli@pani.in,9236814862,IT,Assistant Professor,active
+IT202669,Mr.H.Hemal Babu,hhem@pani.in,9806374871,IT,Assistant Professor,active
+IT202670,Mr.R.Madhavan,rmad@pani.in,9948754713,IT,Assistant Professor,active
+IT202671,Mr.S.Vigneshwaran,vign@pani.in,9639920667,IT,Assistant Professor,active
+IT202672,Ms.A.Abisha,aabi@pani.in,9632949109,IT,Assistant Professor,active
+IT202673,Mrs.S.Saranya,ssar@pani.in,9144664685,IT,Assistant Professor,active
+IT202674,Mr.B.Magudapathy,bmag@pani.in,9742442343,IT,Assistant Professor,active
+IT202675,Mr.M.Kishore,mkis@pani.in,9694830290,IT,Assistant Professor,active
+IT202676,Ms.M.Ramya,mram@pani.in,9604635290,IT,Assistant Professor,active
+EMP077,Mr. Yesuraj,yesu@gmail.com,+919344088926,IT,Professor,active
+EMP033,Mr. Ezra Vethamani,ezra@pani.in,+91 927492739,IT,Professor,active
+EMP034,Mrs. P. Dhivya,dhivya@pani.in,+918274587357,IT,Lecturer,active
+EMP032,Mrs. B. Sasirekha,sasi@gmail.com,+918374867468,IT,Lecturer,active
+EMP024,Mrs. S. Arthi,arthi@pani.in,+91 928477182,IT,Professor,active
+EMP025,Mrs. K. Vidhya,vidhya@pani.in,+91 837464373,IT,Professor,active
+EMP0069,Dr.Gunasekaran,guna@gmail.com,9848373984,IT,associate professor,active
+EMP0070,Mrs A.Shabeena,shabeena@gmail.com,9847282917,IT,associate professor,active
+EMP0071,Mrs. Narmadha devi S,narmadha@gmail.com,9849382829,IT,associate professor,active
+EMP0072,Mr. Raja Karthikeyan,rajakarthikeyan@gmail.com,8483929282,IT,associate professor,active
+EMP0073,Mrs Bhuvana Sundari,bhunvana@gmail.com,8584939383,IT,associate professor,active

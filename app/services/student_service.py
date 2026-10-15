@@ -5,7 +5,9 @@ from fastapi import HTTPException, status, UploadFile
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.models.student import Student
+from app.models.student import Student, StudentEnrollment
+from app.models.attendance import AttendanceMark
+from app.models.day_wise_attendance import DayWiseAttendance
 from app.schemas.student import (
     StudentCreate,
     StudentUpdate,
@@ -169,11 +171,10 @@ class StudentService:
     @staticmethod
     def delete_student(db: Session, student_id: str) -> dict:
         """
-        Deletes a student record from the database.
+        Deletes a student record and its cascade dependencies from the database.
         """
-        student = StudentService.get_student_by_id(db, student_id)
-        db.delete(student)
-        db.commit()
+        StudentService.get_student_by_id(db, student_id)
+        StudentService.bulk_delete_students(db, [student_id])
         return {"message": "Student deleted successfully", "id": student_id}
 
     @staticmethod
@@ -235,14 +236,14 @@ class StudentService:
         # Build mapping dictionaries to resolve foreign keys dynamically
         from app.models.department import Department
         from app.models.batch import Batch
+        from app.utils.bulk_import import build_department_lookup_map
         
-        departments_map = {}
-        for d in db.query(Department).all():
-            departments_map[d.code.lower()] = d.id
-            departments_map[d.name.lower()] = d.id
+        all_departments = db.query(Department).all()
+        departments_map = build_department_lookup_map(all_departments)
             
         batches_map = {}
         for b in db.query(Batch).all():
+            batches_map[(str(b.department_id), b.batch_name.lower())] = b
             batches_map[(b.department_id, b.batch_name.lower())] = b
 
         valid_students, errors = validate_and_sanitize_rows(
@@ -277,12 +278,24 @@ class StudentService:
     @staticmethod
     def bulk_delete_students(db: Session, student_ids: List[str]) -> BulkDeleteResponse:
         """
-        Deletes multiple student records in an atomic transaction.
+        Deletes multiple student records in an atomic transaction,
+        safely cascading deletions of attendance marks, day-wise records,
+        and student enrollments.
         """
         if not student_ids:
             return BulkDeleteResponse(deleted_count=0, message="No student IDs provided")
 
         try:
+            # 1. Delete associated AttendanceMark records
+            db.query(AttendanceMark).filter(AttendanceMark.student_id.in_(student_ids)).delete(synchronize_session=False)
+
+            # 2. Delete associated DayWiseAttendance records
+            db.query(DayWiseAttendance).filter(DayWiseAttendance.student_id.in_(student_ids)).delete(synchronize_session=False)
+
+            # 3. Delete associated StudentEnrollment records
+            db.query(StudentEnrollment).filter(StudentEnrollment.student_id.in_(student_ids)).delete(synchronize_session=False)
+
+            # 4. Delete Student records
             deleted_count = (
                 db.query(Student)
                 .filter(Student.id.in_(student_ids))
@@ -299,4 +312,29 @@ class StudentService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Database error during bulk deletion: {str(e)}",
             )
+
+    @staticmethod
+    def delete_all_students(db: Session) -> BulkDeleteResponse:
+        """
+        Deletes ALL student records in an atomic transaction,
+        cascading deletions of all associated attendance marks,
+        day-wise attendance, and student enrollments.
+        """
+        try:
+            db.query(AttendanceMark).delete(synchronize_session=False)
+            db.query(DayWiseAttendance).delete(synchronize_session=False)
+            db.query(StudentEnrollment).delete(synchronize_session=False)
+            deleted_count = db.query(Student).delete(synchronize_session=False)
+            db.commit()
+            return BulkDeleteResponse(
+                deleted_count=deleted_count,
+                message=f"Successfully deleted all {deleted_count} student(s)",
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error during delete all: {str(e)}",
+            )
+
 

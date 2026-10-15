@@ -22,7 +22,7 @@ class DayWiseAttendance(Base):
     method = Column(Enum(ScanMethod), nullable=True)
     
     marked_by = Column(String, ForeignKey("teachers.id"), nullable=True)
-    marked_at = Column(DateTime, default=datetime.utcnow)
+    marked_at = Column(DateTime, default=datetime.now)
 
     student = relationship("Student", backref="day_wise_records")
     teacher = relationship("Teacher", backref="day_wise_marks_given")

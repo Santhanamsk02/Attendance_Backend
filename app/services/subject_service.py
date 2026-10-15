@@ -6,6 +6,9 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.subject import Subject
+from app.models.timetable import TeacherAssignment
+from app.models.section_assignment import SectionSubjectAssignment
+from app.models.attendance import AttendanceSession
 from app.schemas.subject import (
     SubjectCreate,
     SubjectUpdate,
@@ -151,9 +154,11 @@ class SubjectService:
 
     @staticmethod
     def delete_subject(db: Session, subject_id: str) -> dict:
-        subject = SubjectService.get_subject_by_id(db, subject_id)
-        db.delete(subject)
-        db.commit()
+        """
+        Deletes a subject record and its cascade dependencies from the database.
+        """
+        SubjectService.get_subject_by_id(db, subject_id)
+        SubjectService.bulk_delete_subjects(db, [subject_id])
         return {"message": "Subject deleted successfully", "id": subject_id}
 
     @staticmethod
@@ -189,11 +194,10 @@ class SubjectService:
 
         from app.models.department import Department
         from app.models.batch import Batch
+        from app.utils.bulk_import import build_department_lookup_map
 
         departments = db.query(Department).all()
-        departments_map = {str(d.code.upper()): str(d.id) for d in departments}
-        for d in departments:
-            departments_map[str(d.name.upper())] = str(d.id)
+        departments_map = build_department_lookup_map(departments)
 
         batches = db.query(Batch).all()
         batches_map = {}
@@ -232,14 +236,31 @@ class SubjectService:
 
     @staticmethod
     def bulk_delete_subjects(db: Session, subject_ids: List[str]) -> BulkDeleteResponse:
+        """
+        Deletes multiple subject records in an atomic transaction,
+        safely detaching attendance sessions and cascading deletions of
+        timetable assignments and section-subject rosters.
+        """
         if not subject_ids:
             return BulkDeleteResponse(deleted_count=0, message="No subject IDs provided", not_found=0)
 
         try:
             existing = db.query(Subject).filter(Subject.id.in_(subject_ids)).all()
-            existing_ids = {str(s.id) for s in existing}
+            existing_ids = [str(s.id) for s in existing]
             not_found = len(subject_ids) - len(existing_ids)
             if existing_ids:
+                # 1. Attendance Sessions: detach subject_id safely
+                db.query(AttendanceSession).filter(AttendanceSession.subject_id.in_(existing_ids)).update(
+                    {AttendanceSession.subject_id: None}, synchronize_session=False
+                )
+
+                # 2. Timetable assignments (teacher_assignments)
+                db.query(TeacherAssignment).filter(TeacherAssignment.subject_id.in_(existing_ids)).delete(synchronize_session=False)
+
+                # 3. Section Subject Assignments (section_subject_assignments)
+                db.query(SectionSubjectAssignment).filter(SectionSubjectAssignment.subject_id.in_(existing_ids)).delete(synchronize_session=False)
+
+                # 4. Subject records
                 db.query(Subject).filter(Subject.id.in_(existing_ids)).delete(synchronize_session=False)
                 db.commit()
 
@@ -254,3 +275,37 @@ class SubjectService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Database error during bulk deletion: {str(e)}",
             )
+
+    @staticmethod
+    def delete_all_subjects(db: Session) -> BulkDeleteResponse:
+        """
+        Deletes ALL subject records in an atomic transaction,
+        safely detaching attendance sessions and cascading deletions of
+        timetable assignments and section-subject rosters.
+        """
+        try:
+            # 1. Detach subject_id on attendance sessions
+            db.query(AttendanceSession).update({AttendanceSession.subject_id: None}, synchronize_session=False)
+
+            # 2. Delete all timetable entries for subjects
+            db.query(TeacherAssignment).delete(synchronize_session=False)
+
+            # 3. Delete all section-subject assignments
+            db.query(SectionSubjectAssignment).delete(synchronize_session=False)
+
+            # 4. Delete all subjects
+            deleted_count = db.query(Subject).delete(synchronize_session=False)
+            db.commit()
+
+            return BulkDeleteResponse(
+                deleted_count=deleted_count,
+                message=f"Successfully deleted all {deleted_count} subject(s)",
+                not_found=0,
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error during delete all: {str(e)}",
+            )
+

@@ -33,7 +33,12 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             return LoginResponse(
                 token=f"mock-jwt-teacher-{teacher.id}",
                 role="teacher",
-                user_info={"name": teacher.name, "email": teacher.email, "employee_id": teacher.employee_id}
+                user_info={
+                    "id": teacher.id,
+                    "name": teacher.name,
+                    "email": teacher.email,
+                    "employee_id": teacher.employee_id
+                }
             )
         else:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")

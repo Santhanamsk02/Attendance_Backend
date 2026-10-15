@@ -107,21 +107,41 @@ def update_subject(
     return SubjectService.update_subject(db, subject_id, subject_in)
 
 
+@router.post(
+    "/bulk",
+    response_model=BulkDeleteResponse,
+    summary="Bulk delete subjects",
+)
+@router.post(
+    "/bulk-delete",
+    response_model=BulkDeleteResponse,
+    include_in_schema=False,
+)
+def bulk_delete(body: BulkDeleteRequest, db: Session = Depends(get_db)):
+    return SubjectService.bulk_delete_subjects(db, body.subject_ids)
+
+
+@router.post(
+    "/delete-all",
+    response_model=BulkDeleteResponse,
+    summary="Delete all subjects",
+    description="Deletes all subject records and cascades dependent timetables, assignments, and sessions.",
+)
+@router.delete(
+    "/all",
+    response_model=BulkDeleteResponse,
+    include_in_schema=False,
+)
+def delete_all_subjects(db: Session = Depends(get_db)):
+    return SubjectService.delete_all_subjects(db=db)
+
+
 @router.delete(
     "/{subject_id}",
     summary="Delete a subject",
 )
 def delete_subject(subject_id: str, db: Session = Depends(get_db)):
     return SubjectService.delete_subject(db, subject_id)
-
-
-@router.post(
-    "/bulk",
-    response_model=BulkDeleteResponse,
-    summary="Bulk delete subjects",
-)
-def bulk_delete(body: BulkDeleteRequest, db: Session = Depends(get_db)):
-    return SubjectService.bulk_delete_subjects(db, body.subject_ids)
 
 
 @router.post(

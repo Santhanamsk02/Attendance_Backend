@@ -5,6 +5,7 @@ import openpyxl
 from fastapi import UploadFile, HTTPException, status
 from pydantic import ValidationError
 from app.schemas.subject import SubjectCreate, ImportErrorItem
+from app.utils.bulk_import import resolve_department
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
@@ -211,7 +212,7 @@ def validate_and_sanitize_subject_rows(
             errors.append(ImportErrorItem(row=idx, subject_code=raw_code, error="Department is required"))
             continue
             
-        department_id = departments_map.get(raw_dept)
+        department_id = resolve_department(raw_dept, departments_map)
         if not department_id:
             errors.append(ImportErrorItem(row=idx, subject_code=raw_code, error=f"Department '{raw_dept}' does not exist in the database."))
             continue

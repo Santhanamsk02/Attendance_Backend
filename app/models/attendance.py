@@ -41,7 +41,7 @@ class AttendanceSession(Base):
     room = Column(String(50), nullable=True)
     
     status = Column(Enum(SessionStatus), default=SessionStatus.ACTIVE)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
     completed_at = Column(DateTime, nullable=True)
 
     teacher = relationship("Teacher", backref="attendance_sessions")
@@ -60,7 +60,7 @@ class AttendanceMark(Base):
     method = Column(Enum(ScanMethod), nullable=True)
     
     remarks = Column(Text, nullable=True)
-    marked_at = Column(DateTime, default=datetime.utcnow)
+    marked_at = Column(DateTime, default=datetime.now)
 
     session = relationship("AttendanceSession", back_populates="marks")
     student = relationship("Student", backref="attendance_marks")

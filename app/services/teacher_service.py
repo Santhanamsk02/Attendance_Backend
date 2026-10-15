@@ -7,6 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.models.teacher import Teacher
 from app.models.department import Department
+from app.models.timetable import TeacherAssignment
+from app.models.section_assignment import SectionSubjectAssignment
+from app.models.attendance import AttendanceSession, AttendanceMark
+from app.models.day_wise_attendance import DayWiseAttendance
 from app.schemas.teacher import (
     TeacherCreate,
     TeacherUpdate,
@@ -156,11 +160,10 @@ class TeacherService:
     @staticmethod
     def delete_teacher(db: Session, teacher_id: str) -> dict:
         """
-        Deletes a teacher record from the database.
+        Deletes a teacher record and its cascade dependencies from the database.
         """
-        teacher = TeacherService.get_teacher_by_id(db, teacher_id)
-        db.delete(teacher)
-        db.commit()
+        TeacherService.get_teacher_by_id(db, teacher_id)
+        TeacherService.bulk_delete_teachers(db, [teacher_id])
         return {"message": "Teacher deleted successfully", "id": teacher_id}
 
     @staticmethod
@@ -206,11 +209,9 @@ class TeacherService:
         }
 
         # Build dynamic relational mapping for Departments
+        from app.utils.bulk_import import build_department_lookup_map
         all_depts = db.query(Department).all()
-        departments_map = {}
-        for d in all_depts:
-            departments_map[d.name.lower()] = str(d.id)
-            departments_map[d.code.lower()] = str(d.id)
+        departments_map = build_department_lookup_map(all_depts)
 
         valid_teachers, errors = validate_and_sanitize_teacher_rows(
             raw_rows=raw_rows,
@@ -243,18 +244,40 @@ class TeacherService:
     @staticmethod
     def bulk_delete_teachers(db: Session, teacher_ids: List[str]) -> BulkDeleteResponse:
         """
-        Deletes multiple teacher records in an atomic transaction.
-        Checks for non-existent IDs.
+        Deletes multiple teacher records in an atomic transaction,
+        safely cascading deletions of attendance sessions/marks, timetable assignments,
+        and section-subject rosters.
         """
         if not teacher_ids:
             return BulkDeleteResponse(deleted_count=0, message="No teacher IDs provided", not_found=0)
 
         try:
             existing = db.query(Teacher).filter(Teacher.id.in_(teacher_ids)).all()
-            existing_ids = {str(t.id) for t in existing}
+            existing_ids = [str(t.id) for t in existing]
             requested_count = len(teacher_ids)
             not_found = requested_count - len(existing_ids)
             if existing_ids:
+                # 1. Attendance Sessions & Marks
+                session_ids = [
+                    s[0] for s in db.query(AttendanceSession.id)
+                    .filter(AttendanceSession.teacher_id.in_(existing_ids)).all()
+                ]
+                if session_ids:
+                    db.query(AttendanceMark).filter(AttendanceMark.session_id.in_(session_ids)).delete(synchronize_session=False)
+                    db.query(AttendanceSession).filter(AttendanceSession.id.in_(session_ids)).delete(synchronize_session=False)
+
+                # 2. Day-wise attendance marked by teacher: nullify foreign key
+                db.query(DayWiseAttendance).filter(DayWiseAttendance.marked_by.in_(existing_ids)).update(
+                    {DayWiseAttendance.marked_by: None}, synchronize_session=False
+                )
+
+                # 3. Timetable assignments (teacher_assignments)
+                db.query(TeacherAssignment).filter(TeacherAssignment.teacher_id.in_(existing_ids)).delete(synchronize_session=False)
+
+                # 4. Section Subject Assignments (section_subject_assignments)
+                db.query(SectionSubjectAssignment).filter(SectionSubjectAssignment.teacher_id.in_(existing_ids)).delete(synchronize_session=False)
+
+                # 5. Teacher records
                 db.query(Teacher).filter(Teacher.id.in_(existing_ids)).delete(synchronize_session=False)
                 db.commit()
 
@@ -269,3 +292,41 @@ class TeacherService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Database error during bulk deletion: {str(e)}",
             )
+
+    @staticmethod
+    def delete_all_teachers(db: Session) -> BulkDeleteResponse:
+        """
+        Deletes ALL teacher records in an atomic transaction,
+        safely cascading deletions of attendance sessions/marks, timetable assignments,
+        and section-subject rosters.
+        """
+        try:
+            # 1. Delete all attendance marks and sessions
+            db.query(AttendanceMark).delete(synchronize_session=False)
+            db.query(AttendanceSession).delete(synchronize_session=False)
+
+            # 2. Nullify marked_by on day-wise attendance
+            db.query(DayWiseAttendance).update({DayWiseAttendance.marked_by: None}, synchronize_session=False)
+
+            # 3. Delete all timetable entries
+            db.query(TeacherAssignment).delete(synchronize_session=False)
+
+            # 4. Delete all section-subject assignments
+            db.query(SectionSubjectAssignment).delete(synchronize_session=False)
+
+            # 5. Delete all teachers
+            deleted_count = db.query(Teacher).delete(synchronize_session=False)
+            db.commit()
+
+            return BulkDeleteResponse(
+                deleted_count=deleted_count,
+                message=f"Successfully deleted all {deleted_count} teacher(s)",
+                not_found=0,
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error during delete all: {str(e)}",
+            )
+

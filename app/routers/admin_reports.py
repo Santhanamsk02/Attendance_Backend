@@ -611,7 +611,10 @@ def get_summary(
 
 @router.get("/defaulters")
 def get_defaulters(
-    threshold: float = Query(75.0),
+    threshold: Optional[float] = None,
+    absent_days: Optional[int] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     department_id: Optional[str] = None,
     section: Optional[str] = None,
     batch_id: Optional[str] = None,
@@ -620,30 +623,58 @@ def get_defaulters(
     page_size: int = 50,
     db: Session = Depends(get_db),
 ):
-    # Compute per-student totals from day_wise_attendance
+    from datetime import date
+    
+    # Resolve from_date and to_date
+    if not from_date:
+        earliest_session = db.query(AttendanceSession.date).order_by(AttendanceSession.date.asc()).first()
+        from_date = earliest_session.date.isoformat() if earliest_session else date.today().isoformat()
+    if not to_date:
+        to_date = date.today().isoformat()
+
     base_sql = text("""
-        SELECT s.id, s.roll_no, s.name, s.section, s.department_id, s.semester,
-               s.email, s.phone,
-               COUNT(DISTINCT CASE WHEN dwa.status = 'PRESENT' THEN dwa.date END) AS present_days,
-               (SELECT COUNT(DISTINCT dwa2.date)
-                FROM day_wise_attendance dwa2
-                JOIN students s2 ON dwa2.student_id = s2.id
-                WHERE s2.section = s.section
-               ) AS total_working_days
-        FROM students s
-        LEFT JOIN day_wise_attendance dwa ON dwa.student_id = s.id
-        WHERE s.status = 'active'
-          AND (:dept IS NULL OR s.department_id = :dept)
-          AND (:sec IS NULL OR s.section = :sec)
-          AND (:batch IS NULL OR s.batch_id = :batch)
-          AND (:query IS NULL OR (s.name ILIKE :query_like OR s.roll_no ILIKE :query_like))
-        GROUP BY s.id
-        HAVING total_working_days > 0
-           AND ROUND(CAST(present_days AS FLOAT) / total_working_days * 100, 2) < :threshold
-        ORDER BY ROUND(CAST(present_days AS FLOAT) / total_working_days * 100, 2)
+        WITH student_stats AS (
+            SELECT s.id, s.roll_no, s.name, s.section, s.department_id, s.semester,
+                   s.email, s.phone,
+                   (
+                     SELECT COUNT(DISTINCT ass2.date)
+                     FROM attendance_sessions ass2
+                     JOIN attendance_marks am2 ON am2.session_id = ass2.id
+                     WHERE am2.student_id = s.id
+                       AND am2.status = 'PRESENT'
+                       AND ass2.date >= :from_date
+                       AND ass2.date <= :to_date
+                   ) AS present_days,
+                   (
+                     SELECT COUNT(DISTINCT ass3.date)
+                     FROM attendance_sessions ass3
+                     WHERE ass3.section_id = s.section
+                       AND ass3.date >= :from_date
+                       AND ass3.date <= :to_date
+                   ) AS total_working_days
+            FROM students s
+            WHERE s.status = 'active'
+              AND (:dept IS NULL OR s.department_id = :dept)
+              AND (:sec IS NULL OR s.section = :sec)
+              AND (:batch IS NULL OR s.batch_id = :batch)
+              AND (:query IS NULL OR (s.name ILIKE :query_like OR s.roll_no ILIKE :query_like))
+        )
+        SELECT *,
+               (total_working_days - present_days) AS absent_days,
+               ROUND(CAST(present_days AS FLOAT) / CASE WHEN total_working_days = 0 THEN 1 ELSE total_working_days END * 100, 2) AS attendance_pct
+        FROM student_stats
+        WHERE total_working_days > 0
+          AND (
+            (:absent_days IS NULL AND :threshold IS NULL) OR
+            (:absent_days IS NOT NULL AND (total_working_days - present_days) >= :absent_days) OR
+            (:threshold IS NOT NULL AND ROUND(CAST(present_days AS FLOAT) / CASE WHEN total_working_days = 0 THEN 1 ELSE total_working_days END * 100, 2) <= :threshold)
+          )
+        ORDER BY attendance_pct ASC
     """)
+    
     results = db.execute(base_sql, {
-        "dept": department_id, "sec": section, "threshold": threshold,
+        "dept": department_id, "sec": section, "threshold": threshold, "absent_days": absent_days,
+        "from_date": from_date, "to_date": to_date,
         "batch": batch_id, "query": query, "query_like": f"%{query}%" if query else None
     }).fetchall()
 
@@ -652,16 +683,13 @@ def get_defaulters(
 
     data = []
     for r in paginated:
-        pct = round(r.present_days / r.total_working_days * 100, 2) if r.total_working_days else 0
-        # Shortage: days needed to reach threshold
-        # (present + x) / (total + x) >= threshold/100
-        # x >= (threshold * total - 100 * present) / (100 - threshold)
         needed = 0
-        if threshold < 100:
+        if threshold is not None and threshold < 100:
             num = threshold * r.total_working_days - 100 * r.present_days
             den = 100 - threshold
             if num > 0:
                 needed = int(-(-num // den))  # ceiling division
+        
         data.append({
             "id": r.id,
             "roll_no": r.roll_no,
@@ -673,23 +701,32 @@ def get_defaulters(
             "phone": r.phone,
             "present_days": r.present_days,
             "total_working_days": r.total_working_days,
-            "attendance_pct": pct,
+            "attendance_pct": r.attendance_pct,
+            "absent_days": r.absent_days,
             "days_needed": needed,
         })
 
     return {
         "threshold": threshold,
+        "absent_days": absent_days,
         "total": total,
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size,
         "data": data,
+        "summary": {
+            "from_date": from_date,
+            "to_date": to_date
+        }
     }
 
 
 @router.get("/defaulters/export")
 def export_defaulters(
-    threshold: float = Query(75.0),
+    threshold: Optional[float] = None,
+    absent_days: Optional[int] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     department_id: Optional[str] = None,
     section: Optional[str] = None,
     batch_id: Optional[str] = None,
@@ -701,6 +738,9 @@ def export_defaulters(
 
     data = get_defaulters(
         threshold=threshold,
+        absent_days=absent_days,
+        from_date=from_date,
+        to_date=to_date,
         department_id=department_id,
         section=section,
         batch_id=batch_id,
@@ -711,15 +751,22 @@ def export_defaulters(
     )
     output = io.StringIO()
     fields = ["roll_no", "name", "section", "semester", "email", "phone",
-              "present_days", "total_working_days", "attendance_pct", "days_needed"]
+              "present_days", "total_working_days", "absent_days", "attendance_pct", "days_needed"]
     writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
     writer.writeheader()
     writer.writerows(data["data"])
     output.seek(0)
+    
+    filename = "defaulters_report.csv"
+    if threshold is not None:
+        filename = f"defaulters_{int(threshold)}pct.csv"
+    elif absent_days is not None:
+        filename = f"defaulters_{int(absent_days)}absent.csv"
+        
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=defaulters_{int(threshold)}pct.csv"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

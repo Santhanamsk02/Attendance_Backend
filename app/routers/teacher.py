@@ -13,6 +13,15 @@ from app.models.department import Department
 from app.models.attendance import AttendanceSession, SessionStatus
 from app.schemas.student import StudentResponse
 from app.models.calendar_override import CalendarOverride
+from app.models.special_training import (
+    SpecialTraining,
+    SpecialTrainingSubject,
+    SpecialTrainingEnrollment,
+    SpecialTrainingTimetable,
+    SpecialTrainingStaffAssignment,
+    SpecialTrainingSession,
+    SpecialTrainingMark,
+)
 
 
 router = APIRouter(prefix="/teacher", tags=["Teacher"])
@@ -297,6 +306,51 @@ def get_teacher_timetable(teacher: Teacher = Depends(get_current_teacher), db: S
                         "override_label": p_details.get("type", "Substitute")
                     }
 
+    # Inject Special Training slots assigned to this teacher
+    training_staff_slots = db.query(
+        SpecialTrainingStaffAssignment,
+        SpecialTrainingTimetable,
+        SpecialTraining
+    ).join(
+        SpecialTrainingTimetable,
+        (SpecialTrainingTimetable.training_id == SpecialTrainingStaffAssignment.training_id) &
+        (SpecialTrainingTimetable.day_of_week == SpecialTrainingStaffAssignment.day_of_week) &
+        (SpecialTrainingTimetable.period_id == SpecialTrainingStaffAssignment.period_id)
+    ).join(
+        SpecialTraining,
+        SpecialTraining.id == SpecialTrainingTimetable.training_id
+    ).filter(
+        SpecialTrainingStaffAssignment.teacher_id == teacher.id
+    ).all()
+
+    existing_period_ids = {p.get("id") for p in timeline if isinstance(p, dict)}
+    for staff_assign, slot, training in training_staff_slots:
+        full_day = day_map.get(slot.day_of_week.upper(), slot.day_of_week)
+        if full_day not in grid:
+            grid[full_day] = {}
+
+        if slot.period_id not in existing_period_ids:
+            timeline.append({
+                "type": "period",
+                "id": slot.period_id,
+                "start": slot.start_time or "09:00",
+                "end": slot.end_time or "10:00"
+            })
+            existing_period_ids.add(slot.period_id)
+
+        grid[full_day][slot.period_id] = {
+            "subject": training.name,
+            "title": slot.topic or "Special Training",
+            "code": f"TR-{slot.period_id}",
+            "section": training.batch_name or "TRAINING",
+            "section_display": f"TRAINING: {training.name}",
+            "room": slot.venue or training.venue or "Auditorium",
+            "type": "Special Training",
+            "span": 1,
+            "is_special_training": True,
+            "training_id": training.id
+        }
+
     return {
         "timeline": timeline,
         "grid": grid
@@ -434,7 +488,25 @@ def get_today_classes(teacher: Teacher = Depends(get_current_teacher), db: Sessi
     if day_swap_ov:
         day_type_final = "DAY_SWAP"
 
-    if not assignments:
+    # Fetch Special Training assignments for today
+    training_staff_slots = db.query(
+        SpecialTrainingStaffAssignment,
+        SpecialTrainingTimetable,
+        SpecialTraining
+    ).join(
+        SpecialTrainingTimetable,
+        (SpecialTrainingTimetable.training_id == SpecialTrainingStaffAssignment.training_id) &
+        (SpecialTrainingTimetable.day_of_week == SpecialTrainingStaffAssignment.day_of_week) &
+        (SpecialTrainingTimetable.period_id == SpecialTrainingStaffAssignment.period_id)
+    ).join(
+        SpecialTraining,
+        SpecialTraining.id == SpecialTrainingTimetable.training_id
+    ).filter(
+        SpecialTrainingStaffAssignment.teacher_id == teacher.id,
+        SpecialTrainingStaffAssignment.day_of_week.in_([day_name_short, day_name_long, day_name_short.upper(), day_name_long.upper()])
+    ).all()
+
+    if not assignments and not training_staff_slots:
         return {
             "date": today_str,
             "day_type": day_type_final,
@@ -558,7 +630,6 @@ def get_today_classes(teacher: Teacher = Depends(get_current_teacher), db: Sessi
 
     today_date = today.date()
     today_sessions = db.query(AttendanceSession).filter(
-        AttendanceSession.teacher_id == teacher.id,
         AttendanceSession.date == today_date,
         AttendanceSession.status == SessionStatus.COMPLETED
     ).all()
@@ -568,6 +639,10 @@ def get_today_classes(teacher: Teacher = Depends(get_current_teacher), db: Sessi
         s_code = subj.get("code", s.subject_id)
         completed_sessions.add(f"{s.subject_id}-{s.section_id}-{s.period_id}")
         completed_sessions.add(f"{s_code}-{s.section_id}-{s.period_id}")
+        clean_s_sec = s.section_id.split("-")[-1].strip() if (s.section_id and "-" in s.section_id) else s.section_id
+        completed_sessions.add(f"{s.subject_id}-{clean_s_sec}-{s.period_id}")
+        completed_sessions.add(f"{s_code}-{clean_s_sec}-{s.period_id}")
+
     
     for a_dict in merged_assignments:
         time_data = timeline_map.get(a_dict["period_id"])
@@ -626,6 +701,62 @@ def get_today_classes(teacher: Teacher = Depends(get_current_teacher), db: Sessi
             "is_override": a_dict.get("is_override_in", False),
             "override_label": a_dict.get("override_label", "")
         })
+
+    # Append Special Training classes for Today
+    today_date_obj = today.date()
+    for staff_assign, slot, training in training_staff_slots:
+        sess = db.query(SpecialTrainingSession).filter(
+            SpecialTrainingSession.training_id == training.id,
+            SpecialTrainingSession.date == today_date_obj,
+            func.upper(SpecialTrainingSession.period_id) == slot.period_id.upper()
+        ).first()
+
+        enrolled_count = db.query(SpecialTrainingEnrollment).filter(
+            SpecialTrainingEnrollment.training_id == training.id
+        ).count()
+
+        present_count = 0
+        if sess:
+            present_count = db.query(SpecialTrainingMark).filter(
+                SpecialTrainingMark.session_id == sess.id,
+                SpecialTrainingMark.status == "PRESENT"
+            ).count()
+
+        assigned_staff = [
+            r[0] for r in db.query(Teacher.name).join(
+                SpecialTrainingStaffAssignment, SpecialTrainingStaffAssignment.teacher_id == Teacher.id
+            ).filter(
+                SpecialTrainingStaffAssignment.training_id == training.id,
+                SpecialTrainingStaffAssignment.day_of_week == slot.day_of_week,
+                SpecialTrainingStaffAssignment.period_id == slot.period_id
+            ).all()
+        ]
+
+        slot_time = f"{slot.start_time} - {slot.end_time}" if (slot.start_time and slot.end_time) else "Special Training Time"
+        status_val = "COMPLETED" if (sess and sess.status == "COMPLETED") else ("CURRENT" if (sess and sess.status == "ACTIVE") else "UPCOMING")
+
+        classes.append({
+            "id": f"training-{slot.id}",
+            "time": slot_time,
+            "subject": training.name,
+            "title": slot.topic or training.name,
+            "code": f"TR-{slot.period_id}",
+            "section": training.batch_name or "TRAINING",
+            "section_display": f"TRAINING: {training.name}",
+            "room": slot.venue or training.venue or "Auditorium / Lab",
+            "type": "Special Training",
+            "status": status_val,
+            "period": slot.period_id,
+            "is_override": False,
+            "override_label": "",
+            "is_special_training": True,
+            "training_id": training.id,
+            "training_name": training.name,
+            "session_id": sess.id if sess else None,
+            "total_enrolled": enrolled_count,
+            "present_count": present_count,
+            "assigned_staff": assigned_staff
+        })
         
     day_type_final = "HALF_DAY" if any(ov.override_type == "HALF_DAY" for ov in applicable_overrides) else "NORMAL"
     if day_swap_ov:
@@ -643,9 +774,66 @@ def get_today_classes(teacher: Teacher = Depends(get_current_teacher), db: Sessi
 def get_teacher_roster(
     subject_code: str = Query(..., description="Subject code (e.g. IT501)"),
     section_name: str = Query(..., description="Section Name (e.g. E)"),
+    training_id: Optional[str] = Query(None, description="Optional training ID"),
     teacher: Teacher = Depends(get_current_teacher), 
     db: Session = Depends(get_db)
 ):
+    # Check if Special Training requested
+    target_training = None
+    if training_id:
+        target_training = db.query(SpecialTraining).filter(SpecialTraining.id == training_id).first()
+    elif subject_code.startswith("TR-") or subject_code.startswith("training-"):
+        clean_period = subject_code.replace("TR-", "").replace("training-", "").upper()
+        assignment = db.query(SpecialTrainingStaffAssignment).filter(
+            SpecialTrainingStaffAssignment.teacher_id == teacher.id,
+            SpecialTrainingStaffAssignment.period_id == clean_period
+        ).first()
+        if assignment:
+            target_training = db.query(SpecialTraining).filter(SpecialTraining.id == assignment.training_id).first()
+        if not target_training:
+            target_training = db.query(SpecialTraining).first()
+
+    if target_training:
+        enrolled_students = db.query(
+            Student.id,
+            Student.roll_no,
+            Student.name,
+            Student.email,
+            Student.phone,
+            Student.department_id,
+            Department.name.label("department_name"),
+            Student.batch_id,
+            Student.semester,
+            Student.section,
+            Student.academic_year,
+            Student.status
+        ).join(
+            SpecialTrainingEnrollment, SpecialTrainingEnrollment.student_id == Student.id
+        ).outerjoin(
+            Department, Department.id == Student.department_id
+        ).filter(
+            SpecialTrainingEnrollment.training_id == target_training.id
+        ).order_by(Student.roll_no).all()
+
+        return [
+            {
+                "id": s.id,
+                "roll_no": s.roll_no,
+                "name": s.name,
+                "email": s.email,
+                "phone": s.phone,
+                "department": s.department_name or "Department",
+                "department_name": s.department_name or "Department",
+                "department_id": s.department_id,
+                "batch_id": s.batch_id,
+                "semester": s.semester,
+                "section": s.section,
+                "academic_year": s.academic_year,
+                "status": s.status,
+            }
+            for s in enrolled_students
+        ]
+
     if subject_code == "ENTRY":
         students = db.query(Student).filter(
             Student.department_id == teacher.department_id,

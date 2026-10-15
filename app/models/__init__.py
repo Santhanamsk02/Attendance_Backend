@@ -11,6 +11,39 @@ from app.models.timetable import TeacherAssignment
 from app.models.timetable import TimetableStructure
 from app.models.calendar_override import CalendarOverride
 from app.models.section_assignment import SectionSubjectAssignment
+from app.models.special_training import (
+    SpecialTraining,
+    SpecialTrainingSubject,
+    SpecialTrainingEnrollment,
+    SpecialTrainingTimetable,
+    SpecialTrainingStaffAssignment,
+    SpecialTrainingSession,
+    SpecialTrainingMark,
+)
 
-__all__ = ["Student", "Teacher", "Department", "Batch", "Semester", "Section", "Subject", "Admin", "AttendanceSession", "AttendanceMark", "TeacherAssignment", "TimetableStructure", "CalendarOverride", "DayWiseAttendance", "SectionSubjectAssignment"]
+__all__ = [
+    "Student",
+    "Teacher",
+    "Department",
+    "Batch",
+    "Semester",
+    "Section",
+    "Subject",
+    "Admin",
+    "AttendanceSession",
+    "AttendanceMark",
+    "TeacherAssignment",
+    "TimetableStructure",
+    "CalendarOverride",
+    "DayWiseAttendance",
+    "SectionSubjectAssignment",
+    "SpecialTraining",
+    "SpecialTrainingSubject",
+    "SpecialTrainingEnrollment",
+    "SpecialTrainingTimetable",
+    "SpecialTrainingStaffAssignment",
+    "SpecialTrainingSession",
+    "SpecialTrainingMark",
+]
+
 

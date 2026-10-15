@@ -87,9 +87,11 @@ app.include_router(admin_institution.router, prefix=settings.API_V1_STR)
 app.include_router(section_assignments.router, prefix=settings.API_V1_STR)
 app.include_router(calendar_overrides.router, prefix=settings.API_V1_STR)
 
-from app.routers import admin_attendance_dashboard
+from app.routers import admin_attendance_dashboard, special_training
 app.include_router(admin_attendance_dashboard.router, prefix=settings.API_V1_STR)
 app.include_router(admin_reports.router, prefix=settings.API_V1_STR)
+app.include_router(special_training.router, prefix=settings.API_V1_STR)
+
 
 if __name__ == "__main__":
     import uvicorn

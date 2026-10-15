@@ -84,11 +84,31 @@ def download_import_template():
     summary="Bulk delete teachers",
     description="Deletes multiple teacher records by their UUIDs in an atomic transaction.",
 )
+@router.post(
+    "/bulk-delete",
+    response_model=BulkDeleteResponse,
+    include_in_schema=False,
+)
 def bulk_delete_teachers(
     payload: BulkDeleteRequest,
     db: Session = Depends(get_db),
 ):
     return TeacherService.bulk_delete_teachers(db=db, teacher_ids=payload.teacher_ids)
+
+
+@router.post(
+    "/delete-all",
+    response_model=BulkDeleteResponse,
+    summary="Delete all teachers",
+    description="Deletes all teacher records and cascades dependent timetables, assignments, and sessions.",
+)
+@router.delete(
+    "/all",
+    response_model=BulkDeleteResponse,
+    include_in_schema=False,
+)
+def delete_all_teachers(db: Session = Depends(get_db)):
+    return TeacherService.delete_all_teachers(db=db)
 
 
 @router.get(

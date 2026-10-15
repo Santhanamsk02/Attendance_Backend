@@ -46,3 +46,20 @@ venv.bak/
 # Logs
 logs/
 *.log
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS and Temporary files
+.DS_Store
+Thumbs.db
+*.bak
+temp/
+tmp/
+
+# Workspace & Agents
+.agents/
+graphify-out/
+

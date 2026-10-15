@@ -6,6 +6,7 @@ import openpyxl
 from fastapi import UploadFile, HTTPException, status
 from pydantic import ValidationError
 from app.schemas.teacher import TeacherCreate, ImportErrorItem
+from app.utils.bulk_import import resolve_department
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -165,8 +166,8 @@ def validate_and_sanitize_teacher_rows(
         raw_name = (row.get("name") or "").strip()
         raw_email = (row.get("email") or "").strip().lower() or None
         raw_phone = (row.get("phone") or "").strip() or None
-        raw_dept_name = (row.get("department") or "").strip().lower()
-        dept_id = departments_map.get(raw_dept_name)
+        raw_dept_name = (row.get("department") or "").strip()
+        dept_id = resolve_department(raw_dept_name, departments_map)
         
         raw_desig = (row.get("designation") or "").strip() or None
         raw_status = (row.get("status") or "").strip().lower() or "active"

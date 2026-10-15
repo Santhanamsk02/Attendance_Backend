@@ -25,11 +25,11 @@ class StudentBase(BaseModel):
     @classmethod
     def clean_roll_no(cls, v: str) -> str:
         if isinstance(v, str):
-            v = v.strip().upper()
+            v = re.sub(r"\s+", " ", v).strip().upper()
             if len(v) < 3:
                 raise ValueError("Roll number must be at least 3 characters")
-            if not re.match(r"^[A-Z0-9\-_/]+$", v):
-                raise ValueError("Roll number must contain only letters, numbers, hyphens, or underscores")
+            if not re.match(r"^[A-Z0-9\-_/\s]+$", v):
+                raise ValueError("Roll number must contain only letters, numbers, hyphens, underscores, or spaces")
         return v
 
     @field_validator("name", mode="before")
